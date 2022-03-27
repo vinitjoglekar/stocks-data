@@ -1,0 +1,240 @@
+Updates
+--------
+20-Mar-2022: (Sunday) Downloaded data from 01-Jan-2017 up to 20-Mar-2022.
+
+
+-------------------------------------------------------------------------------------------
+
+01-Jan-2017 - Sunday    - 0
+01-Jan-2018 - Monday    - 1
+01-Jan-2019 - Tuesday   - 2
+01-Jan-2020 - Wednesday - 3
+01-Jan-2021 - Friday    - 5
+01-Jan-2022 - Saturday  - 6
+
+Day of the week:
+1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat, 0=Sun
+
+Market is closed on day 6 and 0 of the week. We don't want to attempt download on these days.
+
+To use this code, copy-past the following functions in Chrome Console to put them in to context.
+- constructUrl_BSE
+- constructUrl_NSE
+- getBhavCopyForRange
+- getBhavCopyForYear
+Then use below API calls to download data.
+
+Note: It should be easy to tweak this implementation to support cross-calendar-year date ranges
+(right now, you cannot - refer doc of getBhavCopyForRange() API). I implemented it this way for
+my convenience, and also due to the fear that NSE/BSE sites might block me.
+
+getBhavCopyForYear("N", 17, 0);
+getBhavCopyForYear("N", 18, 1);
+getBhavCopyForYear("N", 19, 2);
+getBhavCopyForYear("N", 20, 3);
+getBhavCopyForYear("N", 21, 5);
+// Download Bhav Copies for 1-Jan-2022 to 20-Mar-2022
+getBhavCopyForRange("N", 22, [1,0], [20,2], 6);
+getBhavCopyForRange("N", 22, [20,2], [26,2], 0);
+
+
+getBhavCopyForYear("B", 17, 0);
+getBhavCopyForYear("B", 18, 1);
+getBhavCopyForYear("B", 19, 2);
+getBhavCopyForYear("B", 20, 3);
+getBhavCopyForYear("B", 21, 5);
+// Download Bhav Copies for 1-Jan-2022 to 20-Mar-2022
+getBhavCopyForRange("B", 22, [1,0], [20,2], 6);
+
+BSE URL examples:
+https://www.bseindia.com/download/BhavCopy/Equity/EQ_ISINCODE_020117.zip
+https://www.bseindia.com/download/BhavCopy/Equity/EQ_ISINCODE_020322.zip
+
+NSE URL examples:
+https://www1.nseindia.com/content/historical/EQUITIES/2017/JAN/cm02JAN2017bhav.csv.zip
+https://www1.nseindia.com/content/historical/EQUITIES/2022/MAR/cm17MAR2022bhav.csv.zip
+
+// Parameters: day is 1-based, month is 0-based, year is last 2 digits, 
+// all are expected to be integers. Year is assumed to be 20yy.
+var constructUrl_BSE = function (day, month, year) {
+    const url_prefix = 'https://www.bseindia.com/download/BhavCopy/Equity/EQ_ISINCODE_';
+    const url_suffix = '.zip';
+
+    var s_day = (day<10) ? ("0"+day) : (""+day);
+    var s_month = (month<9) ? ("0"+ (month+1)) : ("" + (month+1));
+    var s_year = (year<10) ? ("0"+year) : (""+year);
+    var date = s_day + s_month + s_year;
+    var url = url_prefix + date + url_suffix;
+
+    return url;
+};
+
+// Parameters: day is 1-based, month is 0-based, year is last 2 digits, 
+// all are expected to be integers. Year is assumed to be 20yy.
+var constructUrl_NSE = function (day, month, year) {
+    const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+    const url_prefix = 'https://www1.nseindia.com/content/historical/EQUITIES/';
+    const url_suffix = 'bhav.csv.zip';
+
+    var s_day = (day<10) ? ("0"+day) : (""+day);
+    var s_month = months[month];
+    var s_year = (year<10) ? ("0"+year) : (""+year);
+    var date = s_day + s_month + "20" + s_year;
+    var url = url_prefix + "20" + s_year + "/" + s_month + "/cm" + date + url_suffix;
+
+    return url;
+};
+
+// exchange should be "B" or "N" to indicate BSE and NSE respectively.
+// year should be 17 or higher for BSE, because, BSE had a different URL
+// until 2016, which has not been taken in to account. For NSE, I guess,
+// it can be as low as 0 (which would represent year 2000).
+// start_date and end_date must be arrays of 2 integer values each. Each
+// integer value representing: [0] = day (1-based), [1] = month (0-based)
+// This API will attempt to download Bhav Copy for each weekday falling
+// in the range, start_date & end_date inclusive.
+// In other words, you can use this API for a date range that entirely
+// falls within one calendar year.
+// start_day_of_week should be an integer between 0 to 6 corresponding
+// to weekday of the start_date. Refer the "Day of the week" section above.
+var getBhavCopyForRange = function (exchange, year, start_date, end_date, start_day_of_week) {
+    var days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if (year % 4 == 0) {
+        // Leap year
+        days[1] = 29;
+    }
+
+    var today;
+    var weekday = start_day_of_week;
+    var delay = 0;
+
+    var constructUrl;
+    if (exchange=="N")
+        constructUrl = constructUrl_NSE;
+    else if (exchange=="B")
+        constructUrl = constructUrl_BSE;
+    else {
+        alert("Unknown exchange " + exchange);
+        return ("Unknown exchange " + exchange);
+    }
+
+    // In the for loop below, j iterates through months (0-based), k iterates through days (1-based)
+    kd_start = start_date[0];
+    kd_end   = end_date[0];
+    jm_start = start_date[1];
+    jm_end   = end_date[1];
+
+    if (jm_start<0 || jm_end>11 || kd_start<1 || kd_start>days[jm_start] || kd_end<1 || kd_end>days[jm_end]) {
+        alert("Invalid date range");
+        return ("Invalid date range");
+    }
+    if ((jm_end<jm_start) || (jm_end==jm_start && kd_end<kd_start)) {
+        alert("Invalid date range");
+        return ("Invalid date range");
+    }
+
+    // TODO: Validate that start_date >= end_date
+
+    for (let j=jm_start; j<=jm_end; j++) { // j iterates through months
+        var num_days = (j==jm_end) ? kd_end : days[j];
+        for (let k=kd_start; k<=num_days; k++) { // k iterates through days
+            today = weekday;
+            weekday++;
+            weekday = weekday % 7;
+            if (today==6 || today==0) {
+                continue;
+            }
+
+            // else try to download the file for today
+            var url = constructUrl(k, j, year);
+            var elem = document.createElement('a');
+            elem.href = url;
+            elem.download = url;
+            elem.id="downloadAnchor";
+            elem = document.body.appendChild(elem);
+            // elem.click();
+
+            delay = delay + 5000 + Math.floor(Math.random() * 10000);
+            setTimeout(function(e) {e.click();}, delay, elem);
+        }
+    }
+};
+
+var getBhavCopyForYear = function (exchange, year, jan_1_day_of_week) {
+    getBhavCopyForRange(exchange, year, [1,0], [31,11], jan_1_day_of_week);
+};
+
+-------------------------------------------------------------------------------------------
+
+Postprocessing of downloaded data
+----------------------------------
+
+BSE file name format: EQ_ISINCODE_310817.CSV
+NSE file name format: cm16JAN2017bhav.csv
+
+Extract all zipfiles: 
+find . -type f -name "*.zip" -exec unzip "{}" \;
+
+To rename BSE CSV files - execute the below command, and then execute the commands generated in a.txt
+ls EQ* | sed -e 's/\(.*_\(..\)\(..\)\(..\).*\)/mv \.\/\1 BSE-20\4-\3-\2\.CSV/g' > a.txt
+
+To rename NSE CSV files - execute the below command, and then execute the commands generated in a.txt
+ls cm* | sed -e 's/\(cm\(..\)\(...\)\(20..\)bhav.csv\)/mv \.\/\1 NSE-\4-\3-\2\.csv/g' | sed -e 's/\(.*NSE.*\)JAN/\101/g; s/\(.*NSE.*\)FEB/\102/g; s/\(.*NSE.*\)MAR/\103/g; s/\(.*NSE.*\)APR/\104/g; s/\(.*NSE.*\)MAY/\105/g; s/\(.*NSE.*\)JUN/\106/g; s/\(.*NSE.*\)JUL/\107/g; s/\(.*NSE.*\)AUG/\108/g; s/\(.*NSE.*\)SEP/\109/g; s/\(.*NSE.*\)OCT/\110/g; s/\(.*NSE.*\)NOV/\111/g; s/\(.*NSE.*\)DEC/\112/g' > a.txt
+
+To delete first line of all files in the directory
+find . -type f -name "*.csv" -exec sed -i -e 1,1d "{}" \;
+
+To concatenate all files in the directory
+cat *.csv > NSE-2017.txt
+
+-------------------------------------------------------------------------------------------
+
+// This implementation was extended to support date range instead of forcing a whole
+// year-load of downloads. The extended implementation is getBhavCopyForRange(), and
+// getBhavCopyForYear just delegates to it.
+
+var getBhavCopyForYear_obsolete = function (exchange, year, jan_1_day_of_week) {
+    days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if (year % 4 == 0) {
+        // Leap year
+        days[1] = 29;
+    }
+
+    var today;
+    var weekday = jan_1_day_of_week;
+    var delay = 0;
+
+    var constructUrl;
+    if (exchange=="N")
+        constructUrl = constructUrl_NSE;
+    else if (exchange=="B")
+        constructUrl = constructUrl_BSE;
+    else {
+        alert("Unknown exchange " + exchange);
+        return ("Unknown exchange " + exchange);
+    }
+
+    for (let j=0; j<12; j++) {
+        var num_days = days[j];
+        for (let k=1; k<=num_days; k++) {
+            today = weekday;
+            weekday++;
+            weekday = weekday % 7;
+            if (today==6 || today==0) {
+                continue;
+            }
+
+            // else try to download the file for today
+            var url = constructUrl(k, j, year);
+            var elem = document.createElement('a');
+            elem.href = url;
+            elem.download = url;
+            elem.id="downloadAnchor";
+            elem = document.body.appendChild(elem);
+            // elem.click();
+
+            delay = delay + 5000 + Math.floor(Math.random() * 10000);
+            setTimeout(function(e) {e.click();}, delay, elem);
+        }
+    }
+};
