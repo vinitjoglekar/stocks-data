@@ -188,7 +188,7 @@ To delete first line of all files in the directory
 find . -type f -name "*.csv" -exec sed -i -e 1,1d "{}" \;
 
 To concatenate all files in the directory
-cat *.csv > NSE-2017.txt
+cat *.csv > NSE.txt
 
 -------------------------------------------------------------------------------------------
 
